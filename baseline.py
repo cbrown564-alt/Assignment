@@ -9,8 +9,6 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error
 from sklearn.dummy import DummyRegressor
 
-import talib
-
 
 class Student:
     """
@@ -29,14 +27,6 @@ class Student:
     """
 
     def __init__(
-        # This is called the object's 'state' in OOP - the attributes set here.
-        # These are the default settings for the hyperparameters
-        # that we can update when we initialise the Student() class
-        # and this can be achieved either through a dictionary like this:
-        # Student(config= {n_lags : 10, vol_windows: 30}) or in the args itself:
-        # Student(n_lags=10, vol_windows=30).
-        # If you want to e.g. choose a different model type, you need a dict
-        # because the alpha_grid parameter is specific to Ridge (alpha)
         self,
         config=None,               # accepts None or dict of overrides
         random_state: int = 42,
@@ -52,16 +42,6 @@ class Student:
         alpha_grid=(0.01, 0.1, 1.0, 10.0),
         cv_splits=3,
         min_train_points=200,
-        # This is where you can add in additional hyperparameters
-        tema_window=12,
-        bollinger_bands_window=20,
-        fwma_window=5,
-        obv_window=14,
-        atr_window=14,
-        ichimoku_cloud_window=9,
-        kijun_sen_window=26,
-        senkou_span_a_window=52,
-        senkou_span_b_window=52,
         **kwargs                   # tolerate extra kwargs from caller
     ):
         # defaults
@@ -71,23 +51,13 @@ class Student:
         self.sma_windows = tuple(int(w) for w in sma_windows)
         self.ema_windows = tuple(int(w) for w in ema_windows)
         self.rsi_window = int(rsi_window)
-        self.tema_window = int(tema_window)
-        self.bollinger_bands_window = int(bollinger_bands_window)
-        self.fwma_window = int(fwma_window)
-        self.obv_window = int(obv_window)
-        self.atr_window = int(atr_window)
-        self.ichimoku_cloud_window = int(ichimoku_cloud_window)
-        self.kijun_sen_window = int(kijun_sen_window)
-        self.senkou_span_a_window = int(senkou_span_a_window)
-        self.senkou_span_b_window = int(senkou_span_b_window)
+
         self.alpha_grid = tuple(float(a) for a in alpha_grid)
         self.cv_splits = int(cv_splits)
         self.min_train_points = int(min_train_points)
         self.random_state = int(random_state)
 
         # overrides
-        # This is where they check to see if the hyperparameters in the supplied
-        # dict or function args match the existing ones and update the defaults
         if isinstance(config, dict):
             for k, v in config.items():
                 if hasattr(self, k):
@@ -103,11 +73,6 @@ class Student:
 
     # ---------- helpers ----------
 
-    # Static methods are functions that live inside a class but don't need
-    # access to the objects specific data, i.e. it's a regular function but
-    # it is grouped within the class for organization. In this case they
-    # serve as internal tools for later in the pipeline, and they aren't
-    # used by us
     @staticmethod
     def _close_series(X: pd.DataFrame) -> pd.Series:
         return X["Close"] if "Close" in X.columns else X.iloc[:, 0]
@@ -177,38 +142,6 @@ class Student:
         # RSI
         feats[f"rsi_{self.rsi_window}"] = self._rsi(close, self.rsi_window)
 
-        # Additional features
-        # Default parameters are set in the __init__ method.
-        # We may want to have a range of windows or parameters like with the ema_windows above.
-        # However the model is already overfitting with RidgeRegression so let's keep it simple for now.
-        # A more complex model may be needed to handle the additional features.        
-
-        # HLC3: High + Low + Close / 3 (smoothed price)
-        feats["hlc3"] = (X["High"] + X["Low"] + X["Close"]) / 3
-
-        # Convert relevant columns to float arrays for the talib functions
-        close_vals = X["Close"].astype(float).values
-        volume_vals = X["Volume"].astype(float).values
-        high_vals = X["High"].astype(float).values
-        low_vals = X["Low"].astype(float).values
-
-        # TEMA: Triple Exponential Moving Average (smoothed price)
-        feats["tema"] = talib.TEMA(close_vals, timeperiod=self.tema_window)
-
-        # Bollinger Bands: 20-day SMA +/- 2 std dev (volatility bands)
-        upper, middle, lower = talib.BBANDS(close_vals, timeperiod=self.bollinger_bands_window, nbdevup=2, nbdevdn=2)
-        feats["bollinger_bands"] = upper + 2 * lower
-
-        # FWMA = Fibonacci Weighted Moving Average (smoothed price)
-        # TO DO
-
-        # OBV = On Balance Volume (volume)
-        feats["obv"] = talib.OBV(close_vals, volume_vals)
-
-        # ATR = Average True Range (volatility)
-        # Average True Range (ATR): measures market volatility
-        feats["atr"] = talib.ATR(high_vals, low_vals, close_vals, timeperiod=self.atr_window)
-
         F = pd.DataFrame(feats, index=X.index).replace([np.inf, -np.inf], np.nan)
         F = F.dropna()  # ensure all features present and causal
         return F
@@ -220,16 +153,6 @@ class Student:
         Select Ridge alpha with small TimeSeriesSplit, then fit on all training data.
         Predict y_train directly (H-day cumulative log return).
         """
-
-        # This engineers the new features for X from the raw OLHC data, uses
-        # TimeSeriesSplit to split the data for cross-validation, accounts for some
-        # edge cases (early folds, incorrect data structures, short data history),
-        # runs cross_validation using alpha_grid to identify the best alpha hyperparameter
-        # as measured by the MSE on scaled data using the Ridge Regression model type
-        # in a pipeline,then returns the fitted model (self.pipe_ = True), along with
-        # a record of the winning hyperparameter (self.best_alpha_) and the final,
-        # trained pipeline (self.pipe_). This is known as 'updating the object's state'.
-
         F = self._make_features(X_train)
 
         # Fallback if we can't compute features yet (early folds)
@@ -303,7 +226,5 @@ class Student:
             return pd.Series(0.0, index=idx, name="y_pred")
         if F.empty:
             return pd.Series(0.0, index=X.index, name="y_pred")
-        # Note here it uses the self.pipe_ method for the model defined above
-        # to access the fitted parameters before calling predict
         y_hat = self.pipe_.predict(F.values)
         return pd.Series(y_hat, index=F.index, name="y_pred")
