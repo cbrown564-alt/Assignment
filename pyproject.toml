@@ -1,0 +1,14 @@
+[project]
+name = "assignment"
+version = "0.1.0"
+description = "ML Assignment 1: Stock Market Prediction"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "jupyter>=1.1.1",
+    "matplotlib>=3.10.6",
+    "numpy>=2.3.3",
+    "pandas>=2.3.3",
+    "scikit-learn>=1.7.2",
+    "yfinance>=0.2.66",
+]
