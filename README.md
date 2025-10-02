@@ -1,5 +1,12 @@
 # Predict the Stock Market
+
+## Purpose
+
 The goal is to build a model that can predict the next n-day prices for individual stocks. It should minimise the loss on three metrics: directional accuracy, MAE and RMSE. The main evaluation method is the walk-forward evaluation, so it is critical to avoid data leakage.
+
+## Workflow
+
+### Typical Workflow
 
 The typical machine learning workflow is:
 
@@ -11,6 +18,8 @@ The typical machine learning workflow is:
 - Train the model
 - Evaluate the model
 - Recycle the last two steps - tune hyperparameters, etc.
+
+### Specific Workflow
 
 For us that means:
 
@@ -29,7 +38,7 @@ Throughout the process I need to keep reproducibility in mind, so test in Colab 
 
 The Python module we'll be building on top of for the evaluation is in `student.py` and it will be tested against `mltester.py`.
 
-### Implementation Notes
+## Implementation Notes
 
 I am using uv instead of pip.
 
